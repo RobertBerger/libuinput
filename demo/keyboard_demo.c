@@ -4,6 +4,7 @@
  */
 
 #include <stdio.h>
+#include <termios.h>
 #include <errno.h>
 #include <string.h>
 #include <fcntl.h>
@@ -38,6 +39,33 @@ static struct input_event events[] = {
 		{{0, 0}, EV_KEY, KEY_Y, 0},
 };
 
+static struct input_event qevents[] = {
+                {{0, 0}, EV_KEY, KEY_Q, 1},
+                {{0, 0}, EV_KEY, KEY_Q, 0},
+};
+
+static struct input_event wevents[] = {
+                {{0, 0}, EV_KEY, KEY_W, 1},
+                {{0, 0}, EV_KEY, KEY_W, 0},
+};
+
+
+int mygetch ( void )
+{
+  int ch;
+  struct termios oldt, newt;
+
+  tcgetattr ( STDIN_FILENO, &oldt );
+  newt = oldt;
+  newt.c_lflag &= ~( ICANON | ECHO );
+  tcsetattr ( STDIN_FILENO, TCSANOW, &newt );
+  ch = getchar();
+  tcsetattr ( STDIN_FILENO, TCSANOW, &oldt );
+
+  return ch;
+}
+
+
 int main(int argc, char *argv[]) {
 	struct uinput_tkn *tkn;
 	int err;
@@ -63,9 +91,12 @@ int main(int argc, char *argv[]) {
 	err = uinput_set_valid_event(tkn, UI_SET_KEYBIT, KEY_R);
 	if (err)
 	  fprintf(stderr, "Cannot set event KEY_R");
-	err = uinput_set_valid_event(tkn, UI_SET_KEYBIT, KEY_Y);
+	err = uinput_set_valid_event(tkn, UI_SET_KEYBIT, KEY_T);
 	if (err)
-	  fprintf(stderr, "Cannot set event KEY_Y");
+	  fprintf(stderr, "Cannot set event KEY_T");
+        err = uinput_set_valid_event(tkn, UI_SET_KEYBIT, KEY_Y);
+        if (err)
+          fprintf(stderr, "Cannot set event KEY_Y");
 
 	/* Create uinput device */
 	err = uinput_create_new_device(tkn, &uudev);
@@ -79,12 +110,23 @@ int main(int argc, char *argv[]) {
 	       "you should see the word \"qwery\" on your command line because "
 	       "\"t\" event was not set\n");
 	sleep(10);
+        printf("start ./evtest and press any key to continue and send some events from here\n");
+        mygetch();
 	/* Simulate some events */
 	err = uinput_send_events(tkn, events, 12, 1);
 	if (err) {
 		fprintf(stderr, "Cannot inject event uinput device\n");
 	}
-
+        printf("press any key for an attempt to send one event\n");
+        mygetch();
+        //err = uinput_send_events(tkn, events, 1, 1);
+        err = uinput_send_events(tkn, qevents, 2, 1);
+        err = uinput_send_events(tkn, wevents, 2, 1);
+        if (err) {
+                fprintf(stderr, "Cannot inject event uinput device\n");
+        }
+        printf("press any key to close the uinput demo\n");
+        mygetch();
 	uinput_close(tkn);
 	return 0;
 }
